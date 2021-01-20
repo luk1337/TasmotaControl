@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">TasmotaControl</string>
+
+    <string name="off">Off</string>
+    <string name="on">On</string>
+
+    <string name="tasmota_light">lampka ;3</string>
+    <string name="tasmota_speakers">glośniki ^.^</string>
+</resources>
