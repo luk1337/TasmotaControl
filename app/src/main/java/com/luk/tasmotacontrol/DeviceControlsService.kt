@@ -159,22 +159,22 @@ class DeviceControlsService : ControlsProviderService(), CoroutineScope {
     }
 
     companion object {
-        const val CONTROL_ID_LIGHT = "TASMOTA_LIGHT"
-        const val CONTROL_ID_SPEAKERS = "TASMOTA_SPEAKER"
+        private const val CONTROL_ID_LIGHT = "TASMOTA_LIGHT"
+        private const val CONTROL_ID_SPEAKERS = "TASMOTA_SPEAKER"
 
-        const val TEMPLATE_ID_TOGGLE = "TEMPLATE_TOGGLE"
+        private const val TEMPLATE_ID_TOGGLE = "TEMPLATE_TOGGLE"
 
-        const val POWER_ALL = "POWER0"
-        const val POWER_LIGHT = "POWER1"
-        const val POWER_SPEAKERS = "POWER2"
+        private const val POWER_ALL = "POWER0"
+        private const val POWER_LIGHT = "POWER1"
+        private const val POWER_SPEAKERS = "POWER2"
 
-        const val URL_BASE = "http://192.168.1.225"
-        const val URL_POWER = "${URL_BASE}/cm?cmnd=${POWER_ALL}"
-        const val URL_LIGHT_OFF = "${URL_BASE}/cm?cmnd=${POWER_LIGHT}%200"
-        const val URL_LIGHT_ON = "${URL_BASE}/cm?cmnd=${POWER_LIGHT}%201"
-        const val URL_LIGHT_TOGGLE = "${URL_BASE}/cm?cmnd=${POWER_LIGHT}%202"
-        const val URL_SPEAKER_OFF = "${URL_BASE}/cm?cmnd=${POWER_SPEAKERS}%200"
-        const val URL_SPEAKER_ON = "${URL_BASE}/cm?cmnd=${POWER_SPEAKERS}%201"
-        const val URL_SPEAKER_TOGGLE = "${URL_BASE}/cm?cmnd=${POWER_SPEAKERS}%202"
+        private const val URL_BASE = "http://192.168.1.225"
+        private const val URL_POWER = "${URL_BASE}/cm?cmnd=${POWER_ALL}"
+        private const val URL_LIGHT_OFF = "${URL_BASE}/cm?cmnd=${POWER_LIGHT}%200"
+        private const val URL_LIGHT_ON = "${URL_BASE}/cm?cmnd=${POWER_LIGHT}%201"
+        private const val URL_LIGHT_TOGGLE = "${URL_BASE}/cm?cmnd=${POWER_LIGHT}%202"
+        private const val URL_SPEAKER_OFF = "${URL_BASE}/cm?cmnd=${POWER_SPEAKERS}%200"
+        private const val URL_SPEAKER_ON = "${URL_BASE}/cm?cmnd=${POWER_SPEAKERS}%201"
+        private const val URL_SPEAKER_TOGGLE = "${URL_BASE}/cm?cmnd=${POWER_SPEAKERS}%202"
     }
 }
