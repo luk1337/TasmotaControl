@@ -29,8 +29,7 @@ import kotlin.coroutines.CoroutineContext
 
 class DeviceControlsService : ControlsProviderService(), CoroutineScope {
 
-    lateinit var controlLight: Control
-    lateinit var controlSpeakers: Control
+    lateinit var controls: HashMap<String, ControlContainer>
 
     lateinit var updatePublisher: ReplayProcessor<Control>
 
@@ -42,15 +41,16 @@ class DeviceControlsService : ControlsProviderService(), CoroutineScope {
         Volley.newRequestQueue(applicationContext)
     }
 
+    data class ControlContainer(
+        val control: Control,
+        val tasmotaId: String,
+        val tasmotaToggleUrl: String
+    )
+
     override fun createPublisherForAllAvailable(): Flow.Publisher<Control> {
         createDefaultControls()
 
-        val controlList = mutableListOf(
-            controlLight,
-            controlSpeakers
-        )
-
-        return FlowAdapters.toFlowPublisher(Flowable.fromIterable(controlList))
+        return FlowAdapters.toFlowPublisher(Flowable.fromIterable(controls.map { it.value.control }))
     }
 
     override fun performControlAction(
@@ -60,35 +60,19 @@ class DeviceControlsService : ControlsProviderService(), CoroutineScope {
     ) {
         createDefaultControls()
 
-        if (controlId == CONTROL_ID_LIGHT) {
+        val control: ControlContainer? = controls[controlId]
+
+        if (control != null) {
             requestQueue.add(JsonObjectRequest(
                 Request.Method.GET,
-                URL_LIGHT_TOGGLE,
+                control.tasmotaToggleUrl,
                 null,
                 {
                     consumer.accept(ControlAction.RESPONSE_OK)
                     updatePublisher.onNext(
-                        Control.StatefulBuilder(controlLight)
+                        Control.StatefulBuilder(control.control)
                             .setStatus(Control.STATUS_OK)
-                            .setControlTemplate(createToggleTemplate(it[POWER_LIGHT] == "ON"))
-                            .build()
-                    )
-                },
-                {
-                    consumer.accept(ControlAction.RESPONSE_FAIL)
-                }
-            ))
-        } else if (controlId == CONTROL_ID_SPEAKERS) {
-            requestQueue.add(JsonObjectRequest(
-                Request.Method.GET,
-                URL_SPEAKER_TOGGLE,
-                null,
-                {
-                    consumer.accept(ControlAction.RESPONSE_OK)
-                    updatePublisher.onNext(
-                        Control.StatefulBuilder(controlSpeakers)
-                            .setStatus(Control.STATUS_OK)
-                            .setControlTemplate(createToggleTemplate(it[POWER_SPEAKERS] == "ON"))
+                            .setControlTemplate(createToggleTemplate(it[control.tasmotaId] == "ON"))
                             .build()
                     )
                 },
@@ -109,36 +93,30 @@ class DeviceControlsService : ControlsProviderService(), CoroutineScope {
             val request = JsonObjectRequest(Request.Method.GET, URL_POWER, null, future, future)
             requestQueue.add(request)
 
-            var lightOn = false
-            var lightStatus = Control.STATUS_NOT_FOUND
-
-            var speakersOn = false
-            var speakersStatus = Control.STATUS_NOT_FOUND
+            var response: JSONObject? = null
 
             try {
-                val response = future.get(5, TimeUnit.SECONDS)
-
-                lightOn = response[POWER_LIGHT] == "ON"
-                lightStatus = Control.STATUS_OK
-
-                speakersOn = response[POWER_SPEAKERS] == "ON"
-                speakersStatus = Control.STATUS_OK
+                response = future.get(5, TimeUnit.SECONDS)
             } catch (e: Exception) {
                 // sad :(
             }
 
-            updatePublisher.onNext(
-                Control.StatefulBuilder(controlLight)
-                    .setStatus(lightStatus)
-                    .setControlTemplate(createToggleTemplate(lightOn))
-                    .build()
-            )
-            updatePublisher.onNext(
-                Control.StatefulBuilder(controlSpeakers)
-                    .setStatus(speakersStatus)
-                    .setControlTemplate(createToggleTemplate(speakersOn))
-                    .build()
-            )
+            list.forEach {
+                val control: ControlContainer? = controls[it]
+
+                if (control != null) {
+                    val status =
+                        if (response != null) Control.STATUS_OK else Control.STATUS_NOT_FOUND
+                    val isOn = response != null && response[control.tasmotaId] == "ON"
+
+                    updatePublisher.onNext(
+                        Control.StatefulBuilder(control.control)
+                            .setStatus(status)
+                            .setControlTemplate(createToggleTemplate(isOn))
+                            .build()
+                    )
+                }
+            }
         }
 
         return FlowAdapters.toFlowPublisher(updatePublisher)
@@ -153,14 +131,24 @@ class DeviceControlsService : ControlsProviderService(), CoroutineScope {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        controlLight = Control.StatelessBuilder(CONTROL_ID_LIGHT, pendingIntent)
-            .setTitle(getString(R.string.tasmota_light))
-            .setDeviceType(DeviceTypes.TYPE_LIGHT)
-            .build()
-        controlSpeakers = Control.StatelessBuilder(CONTROL_ID_SPEAKERS, pendingIntent)
-            .setTitle(getString(R.string.tasmota_speakers))
-            .setDeviceType(DeviceTypes.TYPE_GENERIC_ON_OFF)
-            .build()
+        controls = hashMapOf(
+            CONTROL_ID_LIGHT to ControlContainer(
+                Control.StatelessBuilder(CONTROL_ID_LIGHT, pendingIntent)
+                    .setTitle(getString(R.string.tasmota_light))
+                    .setDeviceType(DeviceTypes.TYPE_LIGHT)
+                    .build(),
+                POWER_LIGHT,
+                URL_LIGHT_TOGGLE
+            ),
+            CONTROL_ID_SPEAKERS to ControlContainer(
+                Control.StatelessBuilder(CONTROL_ID_SPEAKERS, pendingIntent)
+                    .setTitle(getString(R.string.tasmota_speakers))
+                    .setDeviceType(DeviceTypes.TYPE_GENERIC_ON_OFF)
+                    .build(),
+                POWER_SPEAKERS,
+                URL_SPEAKER_TOGGLE
+            )
+        )
     }
 
     private fun createToggleTemplate(on: Boolean): ToggleTemplate {
