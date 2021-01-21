@@ -29,11 +29,11 @@ import kotlin.coroutines.CoroutineContext
 
 class DeviceControlsService : ControlsProviderService(), CoroutineScope {
 
-    lateinit var controls: HashMap<String, ControlContainer>
+    private lateinit var controls: HashMap<String, ControlContainer>
 
-    lateinit var updatePublisher: ReplayProcessor<Control>
+    private lateinit var updatePublisher: ReplayProcessor<Control>
 
-    var job: Job = Job()
+    private var job: Job = Job()
     override val coroutineContext: CoroutineContext
         get() = job + Dispatchers.IO
 
