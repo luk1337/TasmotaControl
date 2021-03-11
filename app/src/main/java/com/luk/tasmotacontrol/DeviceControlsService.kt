@@ -9,21 +9,17 @@ import android.service.controls.actions.ControlAction
 import android.service.controls.templates.ControlButton
 import android.service.controls.templates.ToggleTemplate
 import androidx.appcompat.app.AppCompatActivity
-import com.android.volley.Request
-import com.android.volley.RequestQueue
-import com.android.volley.toolbox.JsonObjectRequest
-import com.android.volley.toolbox.RequestFuture
-import com.android.volley.toolbox.Volley
 import io.reactivex.Flowable
 import io.reactivex.processors.ReplayProcessor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import okhttp3.*
+import okio.IOException
 import org.json.JSONObject
 import org.reactivestreams.FlowAdapters
 import java.util.concurrent.Flow
-import java.util.concurrent.TimeUnit
 import java.util.function.Consumer
 import kotlin.coroutines.CoroutineContext
 
@@ -33,13 +29,11 @@ class DeviceControlsService : ControlsProviderService(), CoroutineScope {
 
     private lateinit var updatePublisher: ReplayProcessor<Control>
 
+    private var httpClient = OkHttpClient()
+
     private var job: Job = Job()
     override val coroutineContext: CoroutineContext
         get() = job + Dispatchers.IO
-
-    private val requestQueue: RequestQueue by lazy {
-        Volley.newRequestQueue(applicationContext)
-    }
 
     data class ControlContainer(
         val control: Control,
@@ -63,23 +57,34 @@ class DeviceControlsService : ControlsProviderService(), CoroutineScope {
         val control: ControlContainer? = controls[controlId]
 
         if (control != null) {
-            requestQueue.add(JsonObjectRequest(
-                Request.Method.GET,
-                control.tasmotaToggleUrl,
-                null,
-                {
-                    consumer.accept(ControlAction.RESPONSE_OK)
-                    updatePublisher.onNext(
-                        Control.StatefulBuilder(control.control)
-                            .setStatus(Control.STATUS_OK)
-                            .setControlTemplate(createToggleTemplate(it[control.tasmotaId] == "ON"))
-                            .build()
-                    )
-                },
-                {
+            httpClient.newCall(
+                Request.Builder()
+                    .url(control.tasmotaToggleUrl)
+                    .build()
+            ).enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
                     consumer.accept(ControlAction.RESPONSE_FAIL)
                 }
-            ))
+
+                override fun onResponse(call: Call, response: Response) {
+                    if (!response.isSuccessful) {
+                        consumer.accept(ControlAction.RESPONSE_FAIL)
+                        return
+                    }
+
+                    response.body?.use {
+                        val json = JSONObject(it.string())
+
+                        consumer.accept(ControlAction.RESPONSE_OK)
+                        updatePublisher.onNext(
+                            Control.StatefulBuilder(control.control)
+                                .setStatus(Control.STATUS_OK)
+                                .setControlTemplate(createToggleTemplate(json[control.tasmotaId] == "ON"))
+                                .build()
+                        )
+                    }
+                }
+            })
         }
     }
 
@@ -89,25 +94,28 @@ class DeviceControlsService : ControlsProviderService(), CoroutineScope {
         updatePublisher = ReplayProcessor.create()
 
         launch {
-            val future = RequestFuture.newFuture<JSONObject>()
-            val request = JsonObjectRequest(Request.Method.GET, URL_POWER, null, future, future)
-            requestQueue.add(request)
-
             var response: JSONObject? = null
 
             try {
-                response = future.get(5, TimeUnit.SECONDS)
+                httpClient.newCall(
+                    Request.Builder()
+                        .url(URL_POWER)
+                        .build()
+                ).execute().use {
+                    it.body?.use { body ->
+                        response = JSONObject(body.string())
+                    }
+                    it.close()
+                }
             } catch (e: Exception) {
                 // sad :(
             }
 
             list.forEach {
-                val control: ControlContainer? = controls[it]
-
-                if (control != null) {
+                controls[it]?.let { control ->
                     val status =
                         if (response != null) Control.STATUS_OK else Control.STATUS_NOT_FOUND
-                    val isOn = response != null && response[control.tasmotaId] == "ON"
+                    val isOn = response != null && response!![control.tasmotaId] == "ON"
 
                     updatePublisher.onNext(
                         Control.StatefulBuilder(control.control)
