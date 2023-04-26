@@ -4,6 +4,7 @@ plugins {
 }
 
 android {
+    namespace "com.luk.tasmotacontrol"
     compileSdkVersion 33
 
     defaultConfig {
