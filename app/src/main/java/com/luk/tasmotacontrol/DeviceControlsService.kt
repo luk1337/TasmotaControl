@@ -38,8 +38,11 @@ class DeviceControlsService : ControlsProviderService(), CoroutineScope {
     data class ControlContainer(
         val control: Control,
         val tasmotaId: String,
-        val tasmotaToggleUrl: String
-    )
+        val tasmotaBaseUrl: String
+    ) {
+        val tasmotaToggleUrl = "$tasmotaBaseUrl/cm?cmnd=$tasmotaId%202"
+        val tasmotaStatusUrl = "$tasmotaBaseUrl/cm?cmnd=$tasmotaId"
+    }
 
     override fun createPublisherForAllAvailable(): Flow.Publisher<Control> {
         createDefaultControls()
@@ -94,28 +97,23 @@ class DeviceControlsService : ControlsProviderService(), CoroutineScope {
         updatePublisher = ReplayProcessor.create()
 
         launch {
-            var response: JSONObject? = null
-
-            try {
-                httpClient.newCall(
-                    Request.Builder()
-                        .url(URL_POWER)
-                        .build()
-                ).execute().use {
-                    it.body?.use { body ->
-                        response = JSONObject(body.string())
-                    }
-                    it.close()
-                }
-            } catch (e: Exception) {
-                // sad :(
-            }
-
             list.forEach {
                 controls[it]?.let { control ->
+                    val response = runCatching {
+                        httpClient.newCall(
+                            Request.Builder()
+                                .url(control.tasmotaStatusUrl)
+                                .build()
+                        ).execute().use {
+                            it.body?.use { body ->
+                                JSONObject(body.string())
+                            }
+                        }
+                    }.getOrNull()
+
                     val status =
                         if (response != null) Control.STATUS_OK else Control.STATUS_NOT_FOUND
-                    val isOn = response != null && response!![control.tasmotaId] == "ON"
+                    val isOn = response != null && response[control.tasmotaId] == "ON"
 
                     updatePublisher.onNext(
                         Control.StatefulBuilder(control.control)
@@ -145,16 +143,16 @@ class DeviceControlsService : ControlsProviderService(), CoroutineScope {
                     .setTitle(getString(R.string.tasmota_light))
                     .setDeviceType(DeviceTypes.TYPE_LIGHT)
                     .build(),
-                POWER_LIGHT,
-                URL_LIGHT_TOGGLE
+                "POWER1",
+                "http://192.168.1.225"
             ),
             CONTROL_ID_SPEAKERS to ControlContainer(
                 Control.StatelessBuilder(CONTROL_ID_SPEAKERS, pendingIntent)
                     .setTitle(getString(R.string.tasmota_speakers))
                     .setDeviceType(DeviceTypes.TYPE_GENERIC_ON_OFF)
                     .build(),
-                POWER_SPEAKERS,
-                URL_SPEAKER_TOGGLE
+                "POWER2",
+                "http://192.168.1.225"
             )
         )
     }
@@ -171,18 +169,5 @@ class DeviceControlsService : ControlsProviderService(), CoroutineScope {
         private const val CONTROL_ID_SPEAKERS = "TASMOTA_SPEAKER"
 
         private const val TEMPLATE_ID_TOGGLE = "TEMPLATE_TOGGLE"
-
-        private const val POWER_ALL = "POWER0"
-        private const val POWER_LIGHT = "POWER1"
-        private const val POWER_SPEAKERS = "POWER2"
-
-        private const val URL_BASE = "http://192.168.1.225"
-        private const val URL_POWER = "${URL_BASE}/cm?cmnd=${POWER_ALL}"
-        private const val URL_LIGHT_OFF = "${URL_BASE}/cm?cmnd=${POWER_LIGHT}%200"
-        private const val URL_LIGHT_ON = "${URL_BASE}/cm?cmnd=${POWER_LIGHT}%201"
-        private const val URL_LIGHT_TOGGLE = "${URL_BASE}/cm?cmnd=${POWER_LIGHT}%202"
-        private const val URL_SPEAKER_OFF = "${URL_BASE}/cm?cmnd=${POWER_SPEAKERS}%200"
-        private const val URL_SPEAKER_ON = "${URL_BASE}/cm?cmnd=${POWER_SPEAKERS}%201"
-        private const val URL_SPEAKER_TOGGLE = "${URL_BASE}/cm?cmnd=${POWER_SPEAKERS}%202"
     }
 }
