@@ -143,16 +143,16 @@ class DeviceControlsService : ControlsProviderService(), CoroutineScope {
                     .setTitle(getString(R.string.tasmota_light))
                     .setDeviceType(DeviceTypes.TYPE_LIGHT)
                     .build(),
-                "POWER1",
-                "http://192.168.1.225"
+                "POWER",
+                "http://192.168.1.227"
             ),
             CONTROL_ID_SPEAKERS to ControlContainer(
                 Control.StatelessBuilder(CONTROL_ID_SPEAKERS, pendingIntent)
                     .setTitle(getString(R.string.tasmota_speakers))
                     .setDeviceType(DeviceTypes.TYPE_GENERIC_ON_OFF)
                     .build(),
-                "POWER2",
-                "http://192.168.1.225"
+                "POWER",
+                "http://192.168.1.226"
             )
         )
     }
