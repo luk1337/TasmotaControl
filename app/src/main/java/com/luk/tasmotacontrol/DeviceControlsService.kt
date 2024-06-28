@@ -144,7 +144,7 @@ class DeviceControlsService : ControlsProviderService(), CoroutineScope {
                     .setDeviceType(DeviceTypes.TYPE_LIGHT)
                     .build(),
                 "POWER",
-                "http://192.168.1.227"
+                "http://luk-tasmota-2.lan"
             ),
             CONTROL_ID_SPEAKERS to ControlContainer(
                 Control.StatelessBuilder(CONTROL_ID_SPEAKERS, pendingIntent)
@@ -152,7 +152,7 @@ class DeviceControlsService : ControlsProviderService(), CoroutineScope {
                     .setDeviceType(DeviceTypes.TYPE_GENERIC_ON_OFF)
                     .build(),
                 "POWER",
-                "http://192.168.1.226"
+                "http://luk-tasmota-1.lan"
             )
         )
     }
